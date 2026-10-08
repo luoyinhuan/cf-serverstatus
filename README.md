@@ -24,7 +24,6 @@
 - [七、本地开发与测试](#七本地开发与测试)
 - [八、常见问题](#八常见问题)
 - [九、文件结构](#九文件结构)
-- [十、安全说明](#十安全说明)
 
 ---
 
@@ -315,13 +314,6 @@ Metrics → Row Metrics，并用「Agent 配置」里的额度估算器把间隔
 ① 设了 `VIEW_TOKEN`：带 `?token=<VIEW_TOKEN>` 打开面板 → 直接改密码（不用填当前密码）；
 ② 没设：D1 控制台执行 `DELETE FROM admin;` → 刷新页面重新创建。
 
-**Q：手机上点了没反应/像被什么盖住？**
-确认页面是新版：**查看网页源代码，搜索 `menuBack`** —— 新版里**完全不存在**这个字符串。
-抽屉现在是**没有任何遮罩层**的：点抽屉外面收起、按 Esc 收起、点抽屉里的选项也会收起。
-
-**Q：想让面板也必须登录才能看？**
-设置环境变量 `VIEW_TOKEN`（看板数据也会要求令牌）。账户只保护「Agent 配置」。
-
 **Q：agent 会不会占很多资源？**
 `agent.sh` 每次上报只读几个 `/proc` 文件、调用几次 `awk`，没有常驻进程；`agent.py` 每轮
 `psutil` 采样一次。后台服务用 systemd 的 `Restart=always` 维持。
@@ -337,6 +329,8 @@ Metrics → Row Metrics，并用「Agent 配置」里的额度估算器把间隔
 worker.js                        ← 单文件部署体（粘贴这个）
 README.md                        ← 本文件
 CHANGELOG.md                     ← 改动记录（含动机与验证）
+REVIEW.md                        ← 代码审查报告（8 条发现）
+.gitignore                       ← 排除测试生成物
 agents/                          ← 内嵌 agent 的明文源（改这里，再重新生成）
   install.sh  agent.sh  agent.py
 tools/
@@ -345,26 +339,11 @@ tools/
 _check/                          ← 测试与预览（不参与部署）
   d1-shim.mjs  harness.mjs  admin.mjs  adminui.mjs  panel.mjs
   chart.mjs  focus.mjs  mobile.mjs  overlay.mjs  history.mjs  cost.mjs
-  *.py  *.mjs                    ← 各次改动的脚本与预览生成器
-  render_previews.mjs  render_chart.py  migrations/
+  render_previews.mjs            ← 生成两个预览页与快照
+  render_chart.py                ← 重放绘制调用生成 chart-preview.png
+  preview-desktop.html  preview-mobile.html  preview-snap-*.html  chart-preview.png
+  migrations/                    ← 改动当时的一次性脚本（只作历史记录）
 ```
-
----
-
-## 十、安全说明
-
-- **管理员密码**：PBKDF2-SHA256 加盐（16 字节盐、10 万次迭代），**只存哈希**，任何接口都不返回；
-  迭代次数存在账户行里，将来调高强度也能兼容老哈希（登录成功时自动重新哈希）。
-- **会话**：无状态 HMAC 令牌（`过期时间.随机数.签名`），签名密钥是账户行的 `session_key`，
-  30 天有效，走 `x-admin-token` 请求头（不用 cookie，天然免 CSRF）。
-  **改密码会轮换 `session_key`，其他设备的会话立即失效。**
-- **防爆破**：按 IP 计，连续失败 5 次锁 60 秒；用户名不存在时也照样算一次哈希，避免用响应时间探测账户。
-- **agent 名称/分组**做了字符白名单（字母、数字、汉字、空格、`. _ : -`），
-  它们会被拼进 shell / PowerShell 命令，其余字符一律丢掉。
-- **看板数据默认公开**。要保护就设 `VIEW_TOKEN`（届时面板与查询接口都要令牌）。
-- **上报令牌（agent 令牌）**在浏览器端随机生成、只存在你自己的浏览器里；
-  也可以用 `AGENT_TOKEN` 环境变量固定。认领它需要管理员登录。
-- 首次部署时**谁先创建管理员账户谁就是管理员** —— 建好后建议顺手设置 `VIEW_TOKEN` 作为第二道门。
 
 ---
 
